@@ -5,66 +5,128 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Claude</title>
 <link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/images/icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="mobile-web-app-capable" content="yes">
+<!-- black-translucent：页面铺满整个屏幕（包括状态栏和底部横条），不再留空白 -->
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Claude">
 <meta name="theme-color" content="#faf9f5">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
+  :root {
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --accent: #d97757;
+    --text: #1f1e1d;
+    --text-2: #6b6a67;
+    --text-3: #a8a6a0;
+    /* 背景：几团柔和的色块，玻璃要有东西在后面才看得出来 */
+    --bg:
+      radial-gradient(60% 40% at 10% 15%, rgba(217,119,87,0.20), transparent 70%),
+      radial-gradient(50% 35% at 95% 40%, rgba(255,190,150,0.26), transparent 70%),
+      radial-gradient(70% 45% at 55% 95%, rgba(240,200,210,0.30), transparent 70%),
+      #faf9f5;
+  }
+
+  /* 整个页面钉死在屏幕上，高度跟着真实可见区域走 */
   html, body {
-    height: 100%;
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: var(--app-h, 100%);
     overflow: hidden;
     overscroll-behavior: none;
   }
 
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    background: #faf9f5;
-    color: #1f1e1d;
+    color: var(--text);
     font-size: 15px;
     line-height: 1.6;
+    background: var(--bg);
   }
 
-  #header {
-    padding: 14px 20px;
-    text-align: center;
-    font-size: 15px;
-    font-weight: 500;
-    color: #6b6a67;
-    border-bottom: 1px solid #ecebe6;
-    background: #faf9f5;
-    flex-shrink: 0;
+  /* ===== 液态玻璃 ===== */
+  .glass {
+    position: relative;
+    background: rgba(255, 255, 255, 0.42);
+    -webkit-backdrop-filter: blur(22px) saturate(180%);
+    backdrop-filter: blur(22px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.65);
+    box-shadow:
+      inset 0 1px 1px rgba(255, 255, 255, 0.9),
+      inset 0 -1px 1px rgba(255, 255, 255, 0.25),
+      0 8px 28px rgba(60, 40, 30, 0.10);
+  }
+  /* 上半部分的高光，模拟玻璃反光 */
+  .glass::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0) 45%);
+    pointer-events: none;
+  }
+  .glass > * { position: relative; }
+
+  .iconBtn {
+    width: 36px; height: 36px;
+    border: none;
+    background: transparent;
+    color: var(--text-2);
+    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    position: relative;
-  }
-  #header .title { flex: 1; }
-  #settingsBtn {
-    position: absolute;
-    right: 16px;
-    top: 50%;
-    transform: translateY(-50%);
-    border: none;
-    background: transparent;
-    font-size: 18px;
-    color: #6b6a67;
     cursor: pointer;
-    padding: 4px 8px;
+    flex-shrink: 0;
   }
+  .iconBtn:active { background: rgba(0,0,0,0.06); }
+  .iconBtn svg { width: 20px; height: 20px; }
 
-  #messages {
+  /* ===== 顶栏（浮在上面） ===== */
+  #header {
+    position: absolute;
+    z-index: 10;
+    top: calc(var(--safe-top) + 8px);
+    left: 12px; right: 12px;
+    height: 52px;
+    border-radius: 26px;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+  }
+  #header .title {
     flex: 1;
+    text-align: center;
+    font-size: 15px;
+    font-weight: 600;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    padding: 0 8px;
+  }
+  #header .right { display: flex; }
+
+  /* ===== 消息区（在玻璃下面滚动） ===== */
+  #messages {
+    position: absolute;
+    z-index: 1;
+    inset: 0;
     overflow-y: auto;
-    padding: 20px 16px 8px;
+    -webkit-overflow-scrolling: touch;
+    padding: calc(var(--safe-top) + 80px) 16px var(--input-space, 110px);
     display: flex;
     flex-direction: column;
     gap: 24px;
-    -webkit-overflow-scrolling: touch;
+  }
+
+  .empty {
+    margin: auto;
+    text-align: center;
+    color: var(--text-3);
+    font-size: 14px;
   }
 
   .row {
@@ -73,6 +135,7 @@
     align-items: flex-start;
   }
   .row.me { flex-direction: row-reverse; }
+  .row > div { max-width: calc(100% - 44px); }
 
   .avatar {
     width: 32px;
@@ -87,26 +150,18 @@
   .bubble {
     width: fit-content;
     max-width: 100%;
-    padding: 0;
     white-space: pre-wrap;
     word-break: break-word;
   }
-
-  .row.bot .bubble {
-    color: #1f1e1d;
-    padding-top: 5px;
-  }
-
+  .row.bot .bubble { padding-top: 5px; }
   .row.me .bubble {
-    background: #efece5;
     padding: 10px 14px;
     border-radius: 18px;
-    color: #1f1e1d;
   }
 
   .time {
     font-size: 11px;
-    color: #a8a6a0;
+    color: var(--text-3);
     margin-top: 6px;
   }
   .row.me .time { text-align: right; }
@@ -114,7 +169,7 @@
   .dots { display: inline-flex; gap: 4px; padding-top: 6px; }
   .dots span {
     width: 6px; height: 6px; border-radius: 50%;
-    background: #d97757;
+    background: var(--accent);
     animation: bounce 1.2s infinite;
   }
   .dots span:nth-child(2) { animation-delay: 0.15s; }
@@ -124,19 +179,18 @@
     30% { transform: translateY(-5px); opacity: 1; }
   }
 
+  /* ===== 输入栏（浮在下面） ===== */
   #inputBar {
-    padding: 12px 16px 16px;
-    background: #faf9f5;
-    flex-shrink: 0;
+    position: absolute;
+    z-index: 10;
+    left: 12px; right: 12px;
+    bottom: calc(var(--safe-bottom) + 10px);
   }
   #inputWrap {
     display: flex;
     align-items: flex-end;
-    background: #ffffff;
-    border: 1px solid #e5e3dc;
-    border-radius: 22px;
-    padding: 8px 8px 8px 16px;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    border-radius: 26px;
+    padding: 8px 8px 8px 18px;
   }
   #input {
     flex: 1;
@@ -144,202 +198,343 @@
     outline: none;
     font-size: 16px;
     font-family: inherit;
-    color: #1f1e1d;
+    color: var(--text);
     background: transparent;
     padding: 6px 0;
     resize: none;
     max-height: 120px;
     line-height: 1.4;
   }
-  #input::placeholder { color: #b0aea8; }
+  #input::placeholder { color: #9d9b95; }
 
   #send {
-    width: 34px; height: 34px;
+    width: 36px; height: 36px;
     border: none;
     border-radius: 50%;
-    background: #d97757;
+    background: var(--accent);
     color: #fff;
-    font-size: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     flex-shrink: 0;
+    box-shadow: inset 0 1px 1px rgba(255,255,255,0.4), 0 2px 8px rgba(217,119,87,0.35);
     transition: opacity 0.15s, transform 0.1s;
   }
+  #send svg { width: 18px; height: 18px; }
   #send:active { transform: scale(0.92); }
   #send:disabled { opacity: 0.4; }
 
+  /* ===== 历史会话抽屉 ===== */
+  #mask {
+    position: absolute;
+    inset: 0;
+    z-index: 50;
+    background: rgba(30, 20, 15, 0.18);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s;
+  }
+  #mask.show { opacity: 1; pointer-events: auto; }
+
+  #drawer {
+    position: absolute;
+    z-index: 60;
+    top: calc(var(--safe-top) + 8px);
+    bottom: calc(var(--safe-bottom) + 8px);
+    left: 8px;
+    width: min(300px, 82vw);
+    border-radius: 28px;
+    display: flex;
+    flex-direction: column;
+    transform: translateX(calc(-100% - 20px));
+    transition: transform 0.3s cubic-bezier(.2,.8,.2,1);
+    background: rgba(255, 255, 255, 0.6);
+  }
+  #drawer.show { transform: translateX(0); }
+
+  #drawer .top {
+    display: flex;
+    align-items: center;
+    padding: 14px 10px 10px 18px;
+  }
+  #drawer .top .title { flex: 1; font-weight: 600; font-size: 16px; }
+
+  #newChatBtn {
+    margin: 0 12px 10px;
+    padding: 11px;
+    border: none;
+    border-radius: 16px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    box-shadow: inset 0 1px 1px rgba(255,255,255,0.4);
+  }
+  #newChatBtn:active { opacity: 0.85; }
+
+  #sessionList {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 8px 12px;
+  }
+  .session {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 10px 6px 10px 12px;
+    border-radius: 14px;
+    cursor: pointer;
+  }
+  .session:active { background: rgba(0,0,0,0.05); }
+  .session.active { background: rgba(217, 119, 87, 0.14); }
+  .session .info { flex: 1; min-width: 0; }
+  .session .name {
+    font-size: 14px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .session .date { font-size: 11px; color: var(--text-3); }
+  .session .del { width: 30px; height: 30px; color: var(--text-3); }
+  .session .del svg { width: 16px; height: 16px; }
+  .noSession {
+    text-align: center;
+    color: var(--text-3);
+    font-size: 13px;
+    padding: 24px 0;
+  }
+
   /* ===== 设置页 ===== */
   #settingsPage {
-    position: fixed;
+    position: absolute;
     inset: 0;
-    background: #faf9f5;
     z-index: 100;
     display: none;
     flex-direction: column;
+    padding: calc(var(--safe-top) + 8px) 12px calc(var(--safe-bottom) + 12px);
+    background: var(--bg);
   }
   #settingsPage.show { display: flex; }
 
   #settingsHeader {
-    padding: 14px 20px;
+    height: 52px;
+    border-radius: 26px;
     display: flex;
     align-items: center;
-    border-bottom: 1px solid #ecebe6;
+    padding: 0 8px;
     flex-shrink: 0;
-  }
-  #settingsHeader .back {
-    border: none;
-    background: transparent;
-    font-size: 16px;
-    color: #d97757;
-    cursor: pointer;
-    padding: 4px 0;
   }
   #settingsHeader .title {
     flex: 1;
     text-align: center;
-    font-weight: 500;
-    color: #6b6a67;
+    font-weight: 600;
   }
-  #settingsHeader .placeholder {
-    width: 40px;
-  }
+  #settingsHeader .back { color: var(--accent); }
+  #settingsHeader .placeholder { width: 36px; }
 
   #settingsBody {
     flex: 1;
-    padding: 16px;
+    padding: 16px 4px 0;
     display: flex;
     flex-direction: column;
     gap: 12px;
     overflow-y: auto;
   }
-
   #settingsBody .label {
     font-size: 13px;
-    color: #6b6a67;
+    color: var(--text-2);
     padding: 0 4px;
   }
-
   #profileText {
     flex: 1;
     width: 100%;
-    border: 1px solid #e5e3dc;
-    border-radius: 12px;
-    padding: 14px;
+    border-radius: 20px;
+    padding: 14px 16px;
     font-size: 15px;
     font-family: inherit;
     line-height: 1.6;
-    background: #fff;
-    color: #1f1e1d;
+    color: var(--text);
     resize: none;
     outline: none;
     min-height: 240px;
   }
-  #profileText::placeholder { color: #b0aea8; }
+  #profileText::placeholder { color: #9d9b95; }
 
   #saveBtn {
     padding: 14px;
     border: none;
-    border-radius: 12px;
-    background: #d97757;
+    border-radius: 18px;
+    background: var(--accent);
     color: #fff;
     font-size: 16px;
     font-weight: 500;
     cursor: pointer;
+    box-shadow: inset 0 1px 1px rgba(255,255,255,0.4), 0 4px 14px rgba(217,119,87,0.3);
   }
   #saveBtn:active { opacity: 0.85; }
 
   .saveTip {
     text-align: center;
     font-size: 12px;
-    color: #a8a6a0;
+    color: var(--text-3);
     min-height: 16px;
+  }
+
+  /* 不支持毛玻璃的浏览器，退回成半透明白底 */
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .glass { background: rgba(255, 255, 255, 0.92); }
   }
 </style>
 </head>
 <body>
 
-  <div id="header">
-    <div class="title">Claude</div>
-    <button id="settingsBtn">⚙</button>
-  </div>
-
   <div id="messages"></div>
 
-  <div id="inputBar">
-    <div id="inputWrap">
-      <textarea id="input" rows="1" placeholder="给 Claude 发送消息"></textarea>
-      <button id="send">↑</button>
+  <div id="header" class="glass">
+    <button class="iconBtn" id="historyBtn" aria-label="历史会话">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
+    </button>
+    <div class="title" id="chatTitle">Claude</div>
+    <div class="right">
+      <button class="iconBtn" id="newBtn" aria-label="新对话">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+      </button>
+      <button class="iconBtn" id="settingsBtn" aria-label="设置">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>
+      </button>
     </div>
+  </div>
+
+  <div id="inputBar">
+    <div id="inputWrap" class="glass">
+      <textarea id="input" rows="1" placeholder="给 Claude 发送消息"></textarea>
+      <button id="send" aria-label="发送">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- 历史会话 -->
+  <div id="mask"></div>
+  <div id="drawer" class="glass">
+    <div class="top">
+      <div class="title">历史会话</div>
+      <button class="iconBtn" id="closeDrawer" aria-label="关闭">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <button id="newChatBtn">＋ 新对话</button>
+    <div id="sessionList"></div>
   </div>
 
   <!-- 设置页 -->
   <div id="settingsPage">
-    <div id="settingsHeader">
-      <button class="back" id="backBtn">‹ 返回</button>
+    <div id="settingsHeader" class="glass">
+      <button class="iconBtn back" id="backBtn" aria-label="返回">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
       <div class="title">个人档案</div>
       <div class="placeholder"></div>
     </div>
     <div id="settingsBody">
       <div class="label">用一段话告诉 AI 你是谁、有什么偏好。每次对话它都会带上这段：</div>
-      <textarea id="profileText" placeholder="例如：我叫小明，24岁，哈尔滨人，学计算机的。我喜欢简洁直接的回答，别啰嗦。聊技术用中文，其他随意。我平时喜欢打游戏、看动漫..."></textarea>
+      <textarea id="profileText" class="glass" placeholder="例如：我叫小明，24岁，哈尔滨人，学计算机的。我喜欢简洁直接的回答，别啰嗦。聊技术用中文，其他随意。我平时喜欢打游戏、看动漫..."></textarea>
       <button id="saveBtn">保存</button>
       <div class="saveTip" id="saveTip"></div>
     </div>
   </div>
 
 <script>
-  const messagesEl = document.getElementById('messages');
-  const input = document.getElementById('input');
-  const sendBtn = document.getElementById('send');
-  const history = [];
+  const $ = id => document.getElementById(id);
+  const messagesEl = $('messages');
+  const input = $('input');
+  const sendBtn = $('send');
+  const inputBar = $('inputBar');
 
   const AVATAR_ME = '/images/me.jpg';
   const AVATAR_AI = '/images/ai.jpg';
 
-  // ===== 个人档案（存 localStorage） =====
+  // ===== 让页面高度等于真实可见高度（修复主屏幕打开时底下空一块、键盘弹出错位） =====
+  function fitHeight() {
+    const h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    document.documentElement.style.setProperty('--app-h', h + 'px');
+    window.scrollTo(0, 0);
+    fitInputSpace();
+  }
+
+  // 消息区底部留出输入框的高度，最后一条不会被挡住
+  function fitInputSpace() {
+    const space = messagesEl.clientHeight - inputBar.offsetTop + 16;
+    messagesEl.style.setProperty('--input-space', space + 'px');
+  }
+
+  window.addEventListener('resize', fitHeight);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', fitHeight);
+
+  // ===== 存储（localStorage） =====
   const PROFILE_KEY = 'claude_profile';
-  const settingsPage = document.getElementById('settingsPage');
-  const settingsBtn = document.getElementById('settingsBtn');
-  const backBtn = document.getElementById('backBtn');
-  const profileText = document.getElementById('profileText');
-  const saveBtn = document.getElementById('saveBtn');
-  const saveTip = document.getElementById('saveTip');
+  const SESSIONS_KEY = 'claude_sessions';
+  const CURRENT_KEY = 'claude_current';
+
+  function load(key, fallback) {
+    try {
+      const v = localStorage.getItem(key);
+      return v === null ? fallback : JSON.parse(v);
+    } catch { return fallback; }
+  }
+  function save(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+  }
 
   function loadProfile() {
-    return localStorage.getItem(PROFILE_KEY) || '';
+    try { return localStorage.getItem(PROFILE_KEY) || ''; } catch { return ''; }
   }
-
   function saveProfile(text) {
-    localStorage.setItem(PROFILE_KEY, text);
+    try { localStorage.setItem(PROFILE_KEY, text); } catch {}
   }
 
-  settingsBtn.onclick = () => {
-    profileText.value = loadProfile();
-    saveTip.textContent = '';
-    settingsPage.classList.add('show');
-  };
+  // 会话结构：{ id, title, updatedAt, messages: [{ role, content, time }] }
+  let sessions = load(SESSIONS_KEY, []);
+  let current = null;
 
-  backBtn.onclick = () => {
-    settingsPage.classList.remove('show');
-  };
+  function saveSession(s) {
+    s.updatedAt = Date.now();
+    if (!sessions.includes(s)) sessions.push(s);
+    save(SESSIONS_KEY, sessions);
+  }
 
-  saveBtn.onclick = () => {
-    saveProfile(profileText.value);
-    saveTip.textContent = '已保存 ✓';
-    setTimeout(() => { saveTip.textContent = ''; }, 1500);
-  };
+  function newSession() {
+    current = { id: Date.now().toString(36), title: '新对话', updatedAt: Date.now(), messages: [] };
+    save(CURRENT_KEY, null);
+    render();
+  }
 
-  // ===== 聊天 =====
-  input.addEventListener('input', () => {
-    input.style.height = 'auto';
-    input.style.height = Math.min(input.scrollHeight, 120) + 'px';
-  });
+  function openSession(id) {
+    const s = sessions.find(s => s.id === id);
+    if (!s) return newSession();
+    current = s;
+    save(CURRENT_KEY, id);
+    render();
+  }
 
-  function now() {
-    const d = new Date();
+  function deleteSession(id) {
+    sessions = sessions.filter(s => s.id !== id);
+    save(SESSIONS_KEY, sessions);
+    if (current && current.id === id) newSession();
+    renderSessionList();
+  }
+
+  // ===== 渲染 =====
+  function fmtTime(ts) {
+    const d = new Date(ts);
     return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+  }
+  function fmtDate(ts) {
+    const d = new Date(ts);
+    if (d.toDateString() === new Date().toDateString()) return '今天 ' + fmtTime(ts);
+    return (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + fmtTime(ts);
   }
 
   function makeAvatar(src, alt) {
@@ -350,51 +545,140 @@
     return img;
   }
 
-  function addMsg(text, who) {
+  function scrollToBottom() {
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function addMsg(text, who, ts) {
+    messagesEl.querySelector('.empty')?.remove();
+
     const row = document.createElement('div');
     row.className = 'row ' + who;
 
-    const avatar = makeAvatar(who === 'me' ? AVATAR_ME : AVATAR_AI, who);
-
     const right = document.createElement('div');
-    right.style.maxWidth = 'calc(100% - 44px)';
 
     const bubble = document.createElement('div');
-    bubble.className = 'bubble';
+    bubble.className = 'bubble' + (who === 'me' ? ' glass' : '');
     bubble.textContent = text;
 
     const time = document.createElement('div');
     time.className = 'time';
-    time.textContent = now();
+    time.textContent = fmtTime(ts);
 
     right.appendChild(bubble);
     right.appendChild(time);
-    row.appendChild(avatar);
+    row.appendChild(makeAvatar(who === 'me' ? AVATAR_ME : AVATAR_AI, who));
     row.appendChild(right);
     messagesEl.appendChild(row);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-
-    return { row, bubble, right };
+    scrollToBottom();
   }
 
   function addLoading() {
+    messagesEl.querySelector('.empty')?.remove();
+
     const row = document.createElement('div');
     row.className = 'row bot';
-
-    const avatar = makeAvatar(AVATAR_AI, 'ai');
-
     const right = document.createElement('div');
     const bubble = document.createElement('div');
     bubble.className = 'bubble';
     bubble.innerHTML = '<div class="dots"><span></span><span></span><span></span></div>';
-
     right.appendChild(bubble);
-    row.appendChild(avatar);
+    row.appendChild(makeAvatar(AVATAR_AI, 'ai'));
     row.appendChild(right);
     messagesEl.appendChild(row);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-    return bubble;
+    scrollToBottom();
+    return { bubble, right };
   }
+
+  function render() {
+    messagesEl.innerHTML = '';
+    $('chatTitle').textContent = current.messages.length ? current.title : 'Claude';
+    if (!current.messages.length) {
+      messagesEl.innerHTML = '<div class="empty">有什么想聊的？</div>';
+    }
+    for (const m of current.messages) {
+      addMsg(m.content, m.role === 'user' ? 'me' : 'bot', m.time);
+    }
+    renderSessionList();
+  }
+
+  function renderSessionList() {
+    const list = $('sessionList');
+    list.innerHTML = '';
+    const sorted = [...sessions].sort((a, b) => b.updatedAt - a.updatedAt);
+    if (!sorted.length) {
+      list.innerHTML = '<div class="noSession">还没有聊过天</div>';
+      return;
+    }
+    for (const s of sorted) {
+      const item = document.createElement('div');
+      item.className = 'session' + (current && s.id === current.id ? ' active' : '');
+
+      const info = document.createElement('div');
+      info.className = 'info';
+      const name = document.createElement('div');
+      name.className = 'name';
+      name.textContent = s.title;
+      const date = document.createElement('div');
+      date.className = 'date';
+      date.textContent = fmtDate(s.updatedAt);
+      info.appendChild(name);
+      info.appendChild(date);
+
+      const del = document.createElement('button');
+      del.className = 'iconBtn del';
+      del.setAttribute('aria-label', '删除');
+      del.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+      del.onclick = e => {
+        e.stopPropagation();
+        if (confirm('删除「' + s.title + '」？')) deleteSession(s.id);
+      };
+
+      item.onclick = () => { openSession(s.id); closeDrawer(); };
+      item.appendChild(info);
+      item.appendChild(del);
+      list.appendChild(item);
+    }
+  }
+
+  // ===== 历史会话抽屉 =====
+  function openDrawer() {
+    renderSessionList();
+    input.blur();
+    $('drawer').classList.add('show');
+    $('mask').classList.add('show');
+  }
+  function closeDrawer() {
+    $('drawer').classList.remove('show');
+    $('mask').classList.remove('show');
+  }
+  $('historyBtn').onclick = openDrawer;
+  $('closeDrawer').onclick = closeDrawer;
+  $('mask').onclick = closeDrawer;
+  $('newChatBtn').onclick = () => { newSession(); closeDrawer(); };
+  $('newBtn').onclick = newSession;
+
+  // ===== 设置页 =====
+  const settingsPage = $('settingsPage');
+  $('settingsBtn').onclick = () => {
+    $('profileText').value = loadProfile();
+    $('saveTip').textContent = '';
+    settingsPage.classList.add('show');
+  };
+  $('backBtn').onclick = () => settingsPage.classList.remove('show');
+  $('saveBtn').onclick = () => {
+    saveProfile($('profileText').value);
+    $('saveTip').textContent = '已保存 ✓';
+    setTimeout(() => { $('saveTip').textContent = ''; }, 1500);
+  };
+
+  // ===== 聊天 =====
+  input.addEventListener('input', () => {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+    fitInputSpace();
+  });
+  input.addEventListener('focus', () => setTimeout(scrollToBottom, 300));
 
   let sending = false;
 
@@ -405,42 +689,67 @@
     sendBtn.disabled = true;
 
     const cleanText = text.replace(/\n+/g, ' ');
-    addMsg(cleanText, 'me');
+    const sentAt = Date.now();
+    addMsg(cleanText, 'me', sentAt);
     input.value = '';
     input.style.height = 'auto';
-    history.push({ role: 'user', content: cleanText });
+    fitInputSpace();
 
-    const loadingBubble = addLoading();
+    // 第一句话当作会话标题
+    const session = current;
+    if (!session.messages.length) {
+      session.title = cleanText.slice(0, 20);
+      $('chatTitle').textContent = session.title;
+    }
+    session.messages.push({ role: 'user', content: cleanText, time: sentAt });
+    saveSession(session);
+    save(CURRENT_KEY, session.id);
+
+    const loading = addLoading();
 
     try {
       const res = await fetch('/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: history,
+          messages: session.messages.map(({ role, content }) => ({ role, content })),
           profile: loadProfile()
         }),
       });
       const data = await res.json();
-      loadingBubble.textContent = data.reply;
-      history.push({ role: 'assistant', content: data.reply });
+      const replyAt = Date.now();
+      // 回复回来时可能已经切到别的会话了，所以存到发消息的那条会话里
+      session.messages.push({ role: 'assistant', content: data.reply, time: replyAt });
+      saveSession(session);
+      if (session === current) {
+        loading.bubble.textContent = data.reply;
+        const time = document.createElement('div');
+        time.className = 'time';
+        time.textContent = fmtTime(replyAt);
+        loading.right.appendChild(time);
+      }
     } catch (err) {
-      loadingBubble.textContent = '请求失败：' + err.message;
+      if (session === current) loading.bubble.textContent = '请求失败：' + err.message;
     }
 
-    messagesEl.scrollTop = messagesEl.scrollHeight;
+    if (session === current) scrollToBottom();
     sending = false;
     sendBtn.disabled = false;
   }
 
   sendBtn.onclick = handleSend;
-
   input.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
       handleSend();
     }
   });
+
+  // ===== 启动：打开上次的会话 =====
+  const lastId = load(CURRENT_KEY, null);
+  if (lastId && sessions.some(s => s.id === lastId)) openSession(lastId);
+  else newSession();
+  fitHeight();
 </script>
 </body>
 </html>
