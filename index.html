@@ -22,37 +22,48 @@
     --text: #1f1e1d;
     --text-2: #6b6a67;
     --text-3: #a8a6a0;
-    /* 背景：几团柔和的色块，玻璃要有东西在后面才看得出来 */
+    /* 背景：几团色块，玻璃要有东西在后面才看得出来 */
     --bg:
-      radial-gradient(60% 40% at 10% 15%, rgba(217,119,87,0.20), transparent 70%),
-      radial-gradient(50% 35% at 95% 40%, rgba(255,190,150,0.26), transparent 70%),
-      radial-gradient(70% 45% at 55% 95%, rgba(240,200,210,0.30), transparent 70%),
-      #faf9f5;
+      radial-gradient(55% 35% at 0% 10%, rgba(217,119,87,0.38), transparent 70%),
+      radial-gradient(50% 30% at 100% 35%, rgba(255,170,120,0.40), transparent 70%),
+      radial-gradient(60% 35% at 15% 70%, rgba(255,200,170,0.35), transparent 70%),
+      radial-gradient(70% 40% at 90% 100%, rgba(235,170,190,0.40), transparent 70%),
+      #faf6f0;
   }
 
-  /* 整个页面钉死在屏幕上，高度跟着真实可见区域走 */
+  /* 整个页面钉死在屏幕上，高度由 JS 按真实屏幕算 */
   html, body {
     position: fixed;
     top: 0; left: 0; right: 0;
-    height: var(--app-h, 100%);
+    height: 100vh;
+    height: var(--app-h, 100vh);
     overflow: hidden;
     overscroll-behavior: none;
   }
+
+  html { background: #faf6f0; }
 
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
     color: var(--text);
     font-size: 15px;
     line-height: 1.6;
+  }
+
+  #bg {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
     background: var(--bg);
+    pointer-events: none;
   }
 
   /* ===== 液态玻璃 ===== */
   .glass {
     position: relative;
-    background: rgba(255, 255, 255, 0.42);
-    -webkit-backdrop-filter: blur(22px) saturate(180%);
-    backdrop-filter: blur(22px) saturate(180%);
+    background: rgba(255, 255, 255, 0.5);
+    -webkit-backdrop-filter: blur(30px) saturate(180%);
+    backdrop-filter: blur(30px) saturate(180%);
     border: 1px solid rgba(255, 255, 255, 0.65);
     box-shadow:
       inset 0 1px 1px rgba(255, 255, 255, 0.9),
@@ -249,7 +260,7 @@
     flex-direction: column;
     transform: translateX(calc(-100% - 20px));
     transition: transform 0.3s cubic-bezier(.2,.8,.2,1);
-    background: rgba(255, 255, 255, 0.6);
+    background: rgba(255, 255, 255, 0.45);
   }
   #drawer.show { transform: translateX(0); }
 
@@ -390,6 +401,7 @@
 </head>
 <body>
 
+  <div id="bg"></div>
   <div id="messages"></div>
 
   <div id="header" class="glass">
@@ -457,8 +469,17 @@
   const AVATAR_AI = '/images/ai.jpg';
 
   // ===== 让页面高度等于真实可见高度（修复主屏幕打开时底下空一块、键盘弹出错位） =====
+  // 从主屏幕打开时，iPhone 报给网页的高度会少一截（少的就是状态栏那么高），
+  // 所以没弹键盘的时候直接用整块屏幕的高度
+  const standalone = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
   function fitHeight() {
-    const h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    let h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    const keyboardOpen = window.visualViewport && window.visualViewport.height < window.innerHeight - 100;
+    if (standalone && !keyboardOpen) {
+      const portrait = window.innerHeight >= window.innerWidth;
+      const screenH = portrait ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
+      h = Math.max(h, screenH);
+    }
     document.documentElement.style.setProperty('--app-h', h + 'px');
     window.scrollTo(0, 0);
     fitInputSpace();
