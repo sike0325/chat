@@ -393,6 +393,53 @@
     min-height: 16px;
   }
 
+  /* ===== 自定义背景 ===== */
+  #bgSection {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px;
+    border-radius: 20px;
+    flex-shrink: 0;
+  }
+  #bgPreview {
+    width: 54px; height: 96px;
+    border-radius: 12px;
+    flex-shrink: 0;
+    background: var(--bg);
+    background-size: cover;
+    background-position: center;
+    border: 1px solid rgba(255,255,255,0.8);
+  }
+  #bgSection .btns { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+  .smallBtn {
+    padding: 9px 12px;
+    border: none;
+    border-radius: 14px;
+    font-size: 14px;
+    font-family: inherit;
+    cursor: pointer;
+    background: rgba(255,255,255,0.7);
+    color: var(--text);
+  }
+  .smallBtn.primary { background: var(--accent); color: #fff; }
+  .smallBtn:active { opacity: 0.8; }
+  #bgFile { display: none; }
+
+  /* 用了自己的图片当背景时，AI 的回复也加一层玻璃，不然字看不清 */
+  body.customBg .row.bot .bubble {
+    padding: 10px 14px;
+    border-radius: 18px;
+  }
+  body.customBg .time {
+    color: #fff;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  }
+  body.customBg .empty {
+    color: #fff;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  }
+
   /* 不支持毛玻璃的浏览器，退回成半透明白底 */
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     .glass { background: rgba(255, 255, 255, 0.92); }
@@ -447,11 +494,20 @@
       <button class="iconBtn back" id="backBtn" aria-label="返回">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-      <div class="title">个人档案</div>
+      <div class="title">设置</div>
       <div class="placeholder"></div>
     </div>
     <div id="settingsBody">
-      <div class="label">用一段话告诉 AI 你是谁、有什么偏好。每次对话它都会带上这段：</div>
+      <div class="label">聊天背景</div>
+      <div id="bgSection" class="glass">
+        <div id="bgPreview"></div>
+        <div class="btns">
+          <button class="smallBtn primary" id="bgPick">从相册选一张</button>
+          <button class="smallBtn" id="bgReset">恢复默认</button>
+        </div>
+        <input type="file" id="bgFile" accept="image/*">
+      </div>
+      <div class="label">个人档案：用一段话告诉 AI 你是谁、有什么偏好。每次对话它都会带上这段：</div>
       <textarea id="profileText" class="glass" placeholder="例如：我叫小明，24岁，哈尔滨人，学计算机的。我喜欢简洁直接的回答，别啰嗦。聊技术用中文，其他随意。我平时喜欢打游戏、看动漫..."></textarea>
       <button id="saveBtn">保存</button>
       <div class="saveTip" id="saveTip"></div>
@@ -579,7 +635,7 @@
     const right = document.createElement('div');
 
     const bubble = document.createElement('div');
-    bubble.className = 'bubble' + (who === 'me' ? ' glass' : '');
+    bubble.className = 'bubble' + (who === 'me' || document.body.classList.contains('customBg') ? ' glass' : '');
     bubble.textContent = text;
 
     const time = document.createElement('div');
@@ -601,7 +657,7 @@
     row.className = 'row bot';
     const right = document.createElement('div');
     const bubble = document.createElement('div');
-    bubble.className = 'bubble';
+    bubble.className = 'bubble' + (document.body.classList.contains('customBg') ? ' glass' : '');
     bubble.innerHTML = '<div class="dots"><span></span><span></span><span></span></div>';
     right.appendChild(bubble);
     row.appendChild(makeAvatar(AVATAR_AI, 'ai'));
@@ -693,6 +749,66 @@
     setTimeout(() => { $('saveTip').textContent = ''; }, 1500);
   };
 
+  // ===== 自定义背景（图片压缩后存 localStorage） =====
+  const BG_KEY = 'claude_bg';
+
+  function applyBg() {
+    let img = null;
+    try { img = localStorage.getItem(BG_KEY); } catch {}
+    const value = img ? `url("${img}") center / cover no-repeat` : '';
+    $('bg').style.background = value;
+    $('bgPreview').style.background = value;
+    // 设置页字多，盖一层白纱，不然看不清
+    $('settingsPage').style.background = img
+      ? `linear-gradient(rgba(250,246,240,0.72), rgba(250,246,240,0.72)), ${value}` : '';
+    document.body.classList.toggle('customBg', !!img);
+    document.querySelectorAll('.row.bot .bubble').forEach(b => b.classList.toggle('glass', !!img));
+  }
+
+  // 手机照片动不动好几 MB，缩到长边 1600 再存，不然存不下
+  function compressImage(file) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        resolve(canvas);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片读不出来')); };
+      img.src = url;
+    });
+  }
+
+  $('bgPick').onclick = () => $('bgFile').click();
+  $('bgFile').onchange = async e => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const canvas = await compressImage(file);
+      // 先存高质量，存不下就降质量再试
+      for (const q of [0.85, 0.7, 0.5]) {
+        try {
+          localStorage.setItem(BG_KEY, canvas.toDataURL('image/jpeg', q));
+          applyBg();
+          return;
+        } catch {}
+      }
+      alert('图片太大存不下，换一张试试');
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+  $('bgReset').onclick = () => {
+    try { localStorage.removeItem(BG_KEY); } catch {}
+    applyBg();
+  };
+
   // ===== 聊天 =====
   input.addEventListener('input', () => {
     input.style.height = 'auto';
@@ -767,6 +883,7 @@
   });
 
   // ===== 启动：打开上次的会话 =====
+  applyBg();
   const lastId = load(CURRENT_KEY, null);
   if (lastId && sessions.some(s => s.id === lastId)) openSession(lastId);
   else newSession();
