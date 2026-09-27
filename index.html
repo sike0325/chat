@@ -31,7 +31,7 @@
       #faf6f0;
   }
 
-  /* 整个页面钉死在屏幕上，高度由 JS 按真实屏幕算 */
+  /* 整个页面钉死在屏幕上，高度由 JS 按可见区域算 */
   html, body {
     position: fixed;
     top: 0; left: 0; right: 0;
@@ -42,6 +42,7 @@
   }
 
   html { background: #faf6f0; }
+  html.kb { --safe-bottom: 0px; }
 
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
@@ -524,18 +525,15 @@
   const AVATAR_ME = '/images/me.jpg';
   const AVATAR_AI = '/images/ai.jpg';
 
-  // ===== 让页面高度等于真实可见高度（修复主屏幕打开时底下空一块、键盘弹出错位） =====
-  // 从主屏幕打开时，iPhone 报给网页的高度会少一截（少的就是状态栏那么高），
-  // 所以没弹键盘的时候直接用整块屏幕的高度
-  const standalone = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
+  // 页面高度跟着键盘上面那块可见区域走，键盘弹出来输入框就贴在键盘上
+  // 键盘弹出时去掉底部横条的留白，输入框直接贴着键盘
+  let fullH = 0, lastW = 0;
   function fitHeight() {
-    let h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-    const keyboardOpen = window.visualViewport && window.visualViewport.height < window.innerHeight - 100;
-    if (standalone && !keyboardOpen) {
-      const portrait = window.innerHeight >= window.innerWidth;
-      const screenH = portrait ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
-      h = Math.max(h, screenH);
-    }
+    const vv = window.visualViewport;
+    const h = vv ? vv.height : window.innerHeight;
+    if (window.innerWidth !== lastW) { lastW = window.innerWidth; fullH = 0; }  // 横竖屏切换
+    fullH = Math.max(fullH, h);
+    document.documentElement.classList.toggle('kb', h < fullH - 100);
     document.documentElement.style.setProperty('--app-h', h + 'px');
     window.scrollTo(0, 0);
     fitInputSpace();
